@@ -1,9 +1,8 @@
-name: Deploy static site to GitHub Pages
+name: Deploy static site to GitHub Pages (official actions)
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
 
 jobs:
   deploy:
@@ -11,9 +10,13 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Deploy to gh-pages branch
-        uses: peaceiris/actions-gh-pages@v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./src/scratch/master-construction-portal
+          fetch-depth: 0
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v1
+        with:
+          path: ./src/scratch/master-construction-portal
+
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v1
