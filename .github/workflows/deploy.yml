@@ -13,10 +13,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v2
+      - name: Deploy to GitHub Pages (JamesIves action)
+        uses: JamesIves/github-pages-deploy-action@v4
         with:
-          path: ./src/scratch/master-construction-portal
-
-      - name: Deploy to GitHub Pages
-        uses: actions/deploy-pages@v1
+          branch: gh-pages
+          folder: src/scratch/master-construction-portal
+          clean: true
+          token: ${{ secrets.GITHUB_TOKEN }}
