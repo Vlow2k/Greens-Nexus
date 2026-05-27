@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Send, X } from 'lucide-react';
+import { Send } from 'lucide-react';
 
 const ITEMS = ['Laptop','PC','Monitors','Speakers','Headset','Mouse','Keyboard','Battery Backup','Webcam','Safety Vest','Safety Helmet','Hand Tools','Power Tools','Nametag','Uniforms','Keys & Key Sets','Tablet','Phone'];
 const DEPTS = ['OPS','Accounting','IT','Development','Marketing','Admin'];

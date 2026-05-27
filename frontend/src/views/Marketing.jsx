@@ -40,7 +40,7 @@ export default function Marketing({ activeSub, onSubChange }) {
 
   const notReplied = reviews.filter(r => !r.replied).length;
 
-  const useAiReply = (id) => {
+  const applyAiReply = (id) => {
     const review = reviews.find(r => r.id === id);
     if (review?.aiReply) setReplyDrafts(p => ({ ...p, [id]: review.aiReply }));
     setExpandedAI(id);
@@ -229,7 +229,7 @@ export default function Marketing({ activeSub, onSubChange }) {
                 {!r.replied && (
                   <div>
                     {r.aiReply && expandedAI !== r.id && (
-                      <button onClick={() => useAiReply(r.id)}
+                      <button onClick={() => applyAiReply(r.id)}
                         style={{ background: 'none', border: '1px solid hsla(var(--color-blue), 0.25)', color: 'hsl(var(--color-blue))', padding: '6px 12px', borderRadius: 6, fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                         <Sparkles size={14} /> Use AI Suggested Reply
                       </button>

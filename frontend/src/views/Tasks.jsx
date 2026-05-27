@@ -95,10 +95,9 @@ export default function Tasks() {
       <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
         {[{ id: 'all', label: 'All Tasks' }, { id: 'mobile', label: 'Mobile View' }, { id: 'needs-attention', label: 'Needs Attention' }].map(p => (
           <button key={p.id} onClick={() => setActiveTab(p.id)} style={{
-            border: 'none', padding: '6px 14px', borderRadius: 20, fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer',
+            border: '1px solid var(--border-color)', padding: '6px 14px', borderRadius: 20, fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer',
             backgroundColor: activeTab === p.id ? 'var(--text-primary)' : 'var(--bg-card)',
             color: activeTab === p.id ? 'var(--bg-primary)' : 'var(--text-secondary)',
-            border: '1px solid var(--border-color)',
           }}>{p.label}</button>
         ))}
       </div>

@@ -50,7 +50,7 @@ function NetworkDashboard() {
   }, []);
 
   useEffect(() => {
-    loadOverview();
+    loadOverview(); // eslint-disable-line react-hooks/set-state-in-effect
     const iv = setInterval(loadOverview, 60000);
     return () => clearInterval(iv);
   }, [loadOverview]);

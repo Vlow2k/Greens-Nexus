@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   LayoutDashboard, UserCheck, ShoppingCart, CheckSquare, BookOpen,
-  GraduationCap, Monitor, ShieldCheck, Globe, Cpu, Package, Wifi,
+  GraduationCap, Monitor, Wifi,
   Home, LayoutGrid, Shield, FileText, ClipboardCheck,
   Calculator, ArrowRightLeft, PieChart, Download, CreditCard,
   Building, Server, FileSpreadsheet, Landmark, BarChart3,
