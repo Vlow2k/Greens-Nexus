@@ -1,11 +1,29 @@
 import { useState, useEffect, useCallback } from "react";
-import { RefreshCw, Download, ArrowLeft, AlertTriangle, ChevronDown, ChevronUp } from "lucide-react";
+import { RefreshCw, Download, ArrowLeft, AlertTriangle, ChevronDown, ChevronUp, Wifi } from "lucide-react";
 
 const BASE = `${import.meta.env.VITE_API_BASE ?? "http://localhost:8000"}/unifi`;
 
-export default function IT({ activeSub = "network" }) {
-  if (activeSub === "network") return <NetworkDashboard />;
-  return null;
+const TABS = [
+  { key: 'network', label: 'Network Dashboard', Icon: Wifi },
+];
+
+export default function IT({ activeSub = "network", onSubChange }) {
+  const sub = activeSub || 'network';
+
+  return (
+    <div style={{ animation: 'fadeIn var(--transition-normal) ease-in-out' }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 24, borderBottom: '1px solid var(--border-color)', paddingBottom: 1 }}>
+        {TABS.map(({ key, label, Icon }) => (
+          <button key={key} onClick={() => onSubChange && onSubChange(key)}
+            style={{ background: 'none', border: 'none', padding: '10px 18px', fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 600, fontSize: '0.95rem', cursor: 'pointer', color: sub === key ? 'var(--text-primary)' : 'var(--text-secondary)', position: 'relative', transition: 'color 0.15s', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Icon size={18} /> {label}
+            {sub === key && <span style={{ position: 'absolute', bottom: -1, left: 0, right: 0, height: 2.5, backgroundColor: 'var(--text-primary)', borderRadius: '4px 4px 0 0' }} />}
+          </button>
+        ))}
+      </div>
+      {sub === 'network' && <NetworkDashboard />}
+    </div>
+  );
 }
 
 function NetworkDashboard() {
