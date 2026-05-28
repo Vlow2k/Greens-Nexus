@@ -170,3 +170,57 @@ class LmsCourse(Base):
     duration = Column(String, nullable=False)
     progress = Column(Integer, default=0)
     status = Column(String, default="Enrolled")
+
+
+class Requisition(Base):
+    __tablename__ = "requisitions"
+    id = Column(String, primary_key=True)
+    employee_name = Column(String, nullable=False)
+    employee_dept = Column(String, nullable=False)
+    item = Column(String, nullable=False)
+    quantity = Column(Integer, default=1)
+    reason = Column(String, default="")
+    status = Column(String, default="pending_manager")
+    supervisor_name = Column(String, default="")
+    manager_name = Column(String, default="")
+    manager_approval_date = Column(String, default="")
+    rejection_reason = Column(String, default="")
+    asset_id = Column(String, default="")
+    asset_name = Column(String, default="")
+    asset_category = Column(String, default="")
+    asset_serial = Column(String, default="")
+    asset_allocated_date = Column(String, default="")
+    expected_return_date = Column(String, default="")
+    actual_return_date = Column(String, default="")
+    return_confirmed_by = Column(String, default="")
+    return_asset_condition = Column(String, default="")
+    allocated_by = Column(String, default="")
+    created_at = Column(String, nullable=False)
+    updated_at = Column(String, nullable=False)
+
+
+class HardwareAsset(Base):
+    __tablename__ = "hardware_assets"
+    id = Column(String, primary_key=True)
+    name = Column(String, nullable=False)
+    category = Column(String, nullable=False)
+    serial_number = Column(String, default="")
+    assigned_to = Column(String, default="Unassigned")
+    dept = Column(String, default="")
+    location = Column(String, default="")
+    status = Column(String, default="Available")
+    assigned_req_id = Column(String, default="")
+    purchased = Column(String, default="")
+    warranty_end = Column(String, default="")
+    last_updated = Column(String, default="")
+
+
+class ApprovalHistory(Base):
+    __tablename__ = "approval_history"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    requisition_id = Column(String, nullable=False)
+    action = Column(String, nullable=False)
+    action_by = Column(String, nullable=False)
+    action_role = Column(String, nullable=False)
+    comment = Column(String, default="")
+    created_at = Column(String, nullable=False)

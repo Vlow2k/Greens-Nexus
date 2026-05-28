@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { AuthenticatedTemplate, UnauthenticatedTemplate } from "@azure/msal-react";
+import { RequisitionProvider } from "./RequisitionContext";
 import LoginPage from "./views/LoginPage";
 import Sidebar from "./components/Sidebar";
 import TopHeader from "./components/TopHeader";
@@ -101,6 +102,7 @@ export default function App() {
   return (
     <>
       <AuthenticatedTemplate>
+        <RequisitionProvider>
         <div className="app-container">
           <Sidebar
             activeView={activeView}
@@ -121,6 +123,7 @@ export default function App() {
             </div>
           </main>
         </div>
+        </RequisitionProvider>
       </AuthenticatedTemplate>
       <UnauthenticatedTemplate>
         <LoginPage />

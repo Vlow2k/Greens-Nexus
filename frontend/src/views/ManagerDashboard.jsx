@@ -1,29 +1,52 @@
 import { useState } from 'react';
-import { Folder, AlertCircle, MessageSquare, Clock, Users, SlidersHorizontal, Download } from 'lucide-react';
+import { Folder, AlertCircle, MessageSquare, Clock, Users, SlidersHorizontal, Download, CheckCircle, XCircle, ChevronDown } from 'lucide-react';
+import { useRequisitions } from '../RequisitionContext';
 
 const EMPLOYEES = [
-  { name: 'Sarah Johnson', dept: 'Accounting', tasks: 8, est: 32, act: 18, completed: 3, inprogress: 4, overdue: 1, workload: 85 },
-  { name: 'Michael Chen', dept: 'OPS', tasks: 12, est: 48, act: 24, completed: 5, inprogress: 6, overdue: 1, workload: 95 },
-  { name: 'Emily Rodriguez', dept: 'Development', tasks: 6, est: 24, act: 12, completed: 2, inprogress: 3, overdue: 1, workload: 70 },
-  { name: 'David Kim', dept: 'IT Support', tasks: 5, est: 20, act: 10, completed: 1, inprogress: 3, overdue: 1, workload: 60 },
-  { name: 'Jessica Taylor', dept: 'Marketing', tasks: 9, est: 36, act: 20, completed: 4, inprogress: 4, overdue: 1, workload: 75 },
-  { name: 'Marcus Vance', dept: 'OPS', tasks: 5, est: 20, act: 16, completed: 2, inprogress: 3, overdue: 0, workload: 50 },
+  { name: 'Sarah Johnson',    dept: 'Accounting',  tasks: 8,  est: 32, act: 18, completed: 3, inprogress: 4, overdue: 1, workload: 85 },
+  { name: 'Michael Chen',     dept: 'OPS',         tasks: 12, est: 48, act: 24, completed: 5, inprogress: 6, overdue: 1, workload: 95 },
+  { name: 'Emily Rodriguez',  dept: 'Development', tasks: 6,  est: 24, act: 12, completed: 2, inprogress: 3, overdue: 1, workload: 70 },
+  { name: 'David Kim',        dept: 'IT Support',  tasks: 5,  est: 20, act: 10, completed: 1, inprogress: 3, overdue: 1, workload: 60 },
+  { name: 'Jessica Taylor',   dept: 'Marketing',   tasks: 9,  est: 36, act: 20, completed: 4, inprogress: 4, overdue: 1, workload: 75 },
+  { name: 'Marcus Vance',     dept: 'OPS',         tasks: 5,  est: 20, act: 16, completed: 2, inprogress: 3, overdue: 0, workload: 50 },
 ];
 
-export default function ManagerDashboard() {
-  const [activeTab, setActiveTab] = useState('workload');
+const MANAGER_NAME = 'Visesh Lodha';
 
-  const totalTasks = EMPLOYEES.reduce((s, e) => s + e.tasks, 0);
+export default function ManagerDashboard() {
+  const { requisitions, pendingManagerCount, approveRequisition, rejectRequisition } = useRequisitions();
+
+  const [activeTab,    setActiveTab]    = useState('workload');
+  const [rejectingId,  setRejectingId]  = useState(null);
+  const [rejectReason, setRejectReason] = useState('');
+  const [expandedReq,  setExpandedReq]  = useState(null);
+
+  const totalTasks  = EMPLOYEES.reduce((s, e) => s + e.tasks, 0);
   const totalOverdue = EMPLOYEES.reduce((s, e) => s + e.overdue, 0);
-  const totalEst = EMPLOYEES.reduce((s, e) => s + e.est, 0);
+  const totalEst    = EMPLOYEES.reduce((s, e) => s + e.est, 0);
 
   const workloadColor = (w) => w >= 90 ? 'hsl(var(--color-red))' : w >= 75 ? 'hsl(var(--color-orange))' : 'hsl(var(--color-blue))';
 
+  const pendingReqs = requisitions.filter(r => r.status === 'pending_manager');
+
+  const handleApprove = (id) => {
+    approveRequisition(id, MANAGER_NAME);
+  };
+
+  const handleReject = (id) => {
+    if (!rejectReason.trim()) return;
+    rejectRequisition(id, MANAGER_NAME, rejectReason.trim());
+    setRejectingId(null);
+    setRejectReason('');
+  };
+
+  const fmtDate = (iso) => iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+
   const tabs = [
-    { id: 'workload', label: 'Workload by Employee' },
-    { id: 'projects', label: 'Project-wise Tasks' },
-    { id: 'actions', label: 'Pending Actions' },
-    { id: 'calendar', label: 'Team Calendar' },
+    { id: 'workload',  label: 'Workload by Employee' },
+    { id: 'projects',  label: 'Project-wise Tasks' },
+    { id: 'actions',   label: `Pending Actions${pendingManagerCount > 0 ? ` (${pendingManagerCount})` : ''}` },
+    { id: 'calendar',  label: 'Team Calendar' },
   ];
 
   return (
@@ -46,11 +69,11 @@ export default function ManagerDashboard() {
       {/* KPI Cards */}
       <div className="cards-grid" style={{ gridTemplateColumns: 'repeat(5, 1fr)', marginBottom: 24 }}>
         {[
-          { label: 'Total Tasks', value: totalTasks, helper: 'Across all employees', color: 'card-blue', Icon: Folder },
-          { label: 'Overdue Tasks', value: totalOverdue, helper: 'Requires attention', color: 'card-red', Icon: AlertCircle },
-          { label: 'Pending Action', value: 3, helper: 'No comment/action', color: 'card-orange', Icon: MessageSquare },
-          { label: 'Estimated Hours', value: `${totalEst}h`, helper: 'This week', color: 'card-blue', Icon: Clock },
-          { label: 'Team Members', value: EMPLOYEES.length, helper: 'Active employees', color: 'card-green', Icon: Users },
+          { label: 'Total Tasks',     value: totalTasks,              helper: 'Across all employees', color: 'card-blue',   Icon: Folder },
+          { label: 'Overdue Tasks',   value: totalOverdue,            helper: 'Requires attention',   color: 'card-red',    Icon: AlertCircle },
+          { label: 'Pending Action',  value: 3 + pendingManagerCount, helper: 'No comment/action',    color: 'card-orange', Icon: MessageSquare },
+          { label: 'Estimated Hours', value: `${totalEst}h`,          helper: 'This week',            color: 'card-blue',   Icon: Clock },
+          { label: 'Team Members',    value: EMPLOYEES.length,        helper: 'Active employees',     color: 'card-green',  Icon: Users },
         ].map(({ label, value, helper, color, Icon }) => (
           <div key={label} className={`kpi-card ${color}`} style={{ cursor: 'default' }}>
             <div className="kpi-card-header">
@@ -66,16 +89,13 @@ export default function ManagerDashboard() {
       {/* Tab Navigation */}
       <div style={{ display: 'flex', gap: 6, marginBottom: 20 }}>
         {tabs.map(t => (
-          <button
-            key={t.id}
-            onClick={() => setActiveTab(t.id)}
+          <button key={t.id} onClick={() => setActiveTab(t.id)}
             style={{
               border: 'none', padding: '7px 16px', borderRadius: 20, fontWeight: 600, fontSize: '13px',
               fontFamily: 'Inter, sans-serif', cursor: 'pointer', transition: 'all 0.13s',
               background: activeTab === t.id ? 'var(--ink)' : 'rgba(0,0,0,0.05)',
               color: activeTab === t.id ? 'var(--sidebar-active-text)' : 'var(--muted)',
-            }}
-          >
+            }}>
             {t.label}
           </button>
         ))}
@@ -83,6 +103,8 @@ export default function ManagerDashboard() {
 
       {/* Tab Content */}
       <div className="requisitions-list-card">
+
+        {/* ── Workload ── */}
         {activeTab === 'workload' && (
           <>
             <div style={{ marginBottom: 20 }}>
@@ -133,6 +155,7 @@ export default function ManagerDashboard() {
           </>
         )}
 
+        {/* ── Projects ── */}
         {activeTab === 'projects' && (
           <>
             <h3>Project-wise Tasks Analysis</h3>
@@ -167,15 +190,123 @@ export default function ManagerDashboard() {
           </>
         )}
 
+        {/* ── Pending Actions ── */}
         {activeTab === 'actions' && (
           <>
-            <h3>Pending Action Alerts</h3>
-            <p style={{ color: 'var(--text-secondary)', marginBottom: 20 }}>Manager alerts requiring approval or commentary.</p>
+            {/* Purchase Requisitions awaiting approval */}
+            <div style={{ marginBottom: 28 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                <div>
+                  <h3 style={{ fontSize: '15px', fontWeight: 700, letterSpacing: '-.02em', marginBottom: 2 }}>Purchase Requisitions</h3>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Review and approve or reject employee asset requests.</p>
+                </div>
+                {pendingManagerCount > 0 && (
+                  <span className="status-badge status-pending" style={{ fontSize: '0.8rem' }}>{pendingManagerCount} pending</span>
+                )}
+              </div>
+
+              {pendingReqs.length === 0 ? (
+                <div style={{ border: '1px dashed var(--border-color)', borderRadius: 8, padding: '28px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                  No purchase requisitions awaiting approval.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {pendingReqs.map(req => (
+                    <div key={req.id} style={{ border: '1px solid var(--border-color)', borderRadius: 8, overflow: 'hidden', backgroundColor: 'var(--bg-primary)' }}>
+                      {/* Main row */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '14px 16px' }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                            <span style={{ fontFamily: 'monospace', fontSize: '0.78rem', color: 'var(--text-muted)', background: 'var(--border-color)', padding: '2px 7px', borderRadius: 4 }}>{req.id}</span>
+                            <strong style={{ fontSize: '0.92rem' }}>{req.item}</strong>
+                            <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>× {req.quantity}</span>
+                          </div>
+                          <div style={{ marginTop: 5, fontSize: '0.84rem', color: 'var(--text-secondary)', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                            <span><strong>By:</strong> {req.employeeName}</span>
+                            <span><strong>Dept:</strong> {req.employeeDept}</span>
+                            <span><strong>Supervisor:</strong> {req.supervisorName}</span>
+                            <span><strong>Submitted:</strong> {fmtDate(req.createdAt)}</span>
+                          </div>
+                        </div>
+
+                        {/* Expand reason */}
+                        <button
+                          onClick={() => setExpandedReq(expandedReq === req.id ? null : req.id)}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4, borderRadius: 4, display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.78rem' }}>
+                          Reason <ChevronDown size={13} style={{ transform: expandedReq === req.id ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+                        </button>
+
+                        {/* Action buttons (hidden while in reject input mode) */}
+                        {rejectingId !== req.id && (
+                          <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                            <button
+                              className="primary-btn"
+                              style={{ padding: '5px 14px', fontSize: '0.82rem', background: 'hsl(var(--color-green))' }}
+                              onClick={() => handleApprove(req.id)}>
+                              <CheckCircle size={13} /> Approve
+                            </button>
+                            <button
+                              className="secondary-btn"
+                              style={{ padding: '5px 14px', fontSize: '0.82rem', color: 'hsl(var(--color-red))', borderColor: 'hsl(var(--color-red))' }}
+                              onClick={() => { setRejectingId(req.id); setRejectReason(''); }}>
+                              <XCircle size={13} /> Reject
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Reason expansion */}
+                      {expandedReq === req.id && (
+                        <div style={{ borderTop: '1px solid var(--border-color)', padding: '10px 16px', background: 'var(--bg-card)', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                          <strong>Reason:</strong> {req.reason || '—'}
+                        </div>
+                      )}
+
+                      {/* Rejection reason input */}
+                      {rejectingId === req.id && (
+                        <div style={{ borderTop: '1px solid var(--border-color)', padding: '12px 16px', background: 'hsla(0,80%,50%,0.04)' }}>
+                          <p style={{ fontSize: '0.82rem', marginBottom: 8, color: 'hsl(var(--color-red))', fontWeight: 600 }}>Enter rejection reason:</p>
+                          <textarea
+                            className="form-input" rows={2}
+                            style={{ width: '100%', resize: 'vertical', fontSize: '0.85rem' }}
+                            placeholder="Explain why this request is being rejected..."
+                            value={rejectReason}
+                            onChange={e => setRejectReason(e.target.value)}
+                            autoFocus
+                          />
+                          <div style={{ display: 'flex', gap: 8, marginTop: 10, justifyContent: 'flex-end' }}>
+                            <button
+                              className="secondary-btn"
+                              style={{ padding: '5px 12px', fontSize: '0.82rem' }}
+                              onClick={() => { setRejectingId(null); setRejectReason(''); }}>
+                              Cancel
+                            </button>
+                            <button
+                              className="primary-btn"
+                              style={{ padding: '5px 14px', fontSize: '0.82rem', background: 'hsl(var(--color-red))' }}
+                              onClick={() => handleReject(req.id)}
+                              disabled={!rejectReason.trim()}>
+                              Confirm Reject
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Divider */}
+            <div style={{ borderTop: '1px solid var(--border-color)', marginBottom: 20 }} />
+
+            {/* Other alerts */}
+            <h3 style={{ marginBottom: 14 }}>Other Pending Alerts</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {[
-                { color: 'red', title: 'Overdue Task Alert', body: 'Sarah Johnson has not updated "Q2 Invoice Audit" (due 2 days ago).', btn: 'Send Reminder' },
+                { color: 'red',    title: 'Overdue Task Alert',      body: 'Sarah Johnson has not updated "Q2 Invoice Audit" (due 2 days ago).', btn: 'Send Reminder' },
                 { color: 'orange', title: 'Material Approval Needed', body: 'Apex Concrete Requisition #8492 ($14,400) requires leadership sign-off.', btn: 'Review Req' },
-                { color: 'blue', title: 'Shift Discrepancy', body: 'Michael Chen logged 12 hours overtime on Site-B excavation without approval.', btn: 'Acknowledge' },
+                { color: 'blue',   title: 'Shift Discrepancy',        body: 'Michael Chen logged 12 hours overtime on Site-B excavation without approval.', btn: 'Acknowledge' },
               ].map(a => (
                 <div key={a.title} style={{ border: '1px solid var(--border-color)', borderRadius: 8, padding: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--bg-primary)' }}>
                   <div>
@@ -189,6 +320,7 @@ export default function ManagerDashboard() {
           </>
         )}
 
+        {/* ── Calendar ── */}
         {activeTab === 'calendar' && (
           <>
             <h3>Team Schedule Calendar</h3>
@@ -210,6 +342,7 @@ export default function ManagerDashboard() {
             </div>
           </>
         )}
+
       </div>
     </div>
   );

@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback } from "react";
-import { RefreshCw, Download, ArrowLeft, AlertTriangle, ChevronDown, ChevronUp, Laptop, Globe, Wifi, Plus, ExternalLink, AlertCircle } from "lucide-react";
+import { RefreshCw, Download, ArrowLeft, AlertTriangle, ChevronDown, ChevronUp, Laptop, Globe, Wifi, Plus, ExternalLink, AlertCircle, Package, CheckCircle, RotateCcw, FileText } from "lucide-react";
+import { useRequisitions } from "../RequisitionContext";
 
 const BASE = `${import.meta.env.VITE_API_BASE ?? "http://localhost:8000"}/unifi`;
 
 const TABS = [
-  { key: 'network',    label: 'Network Dashboard',  Icon: Wifi },
-  { key: 'it-assets',  label: 'Asset Management',   Icon: Laptop },
-  { key: 'it-websites',label: 'Website Management', Icon: Globe },
+  { key: 'network',     label: 'Network Dashboard',  Icon: Wifi },
+  { key: 'it-assets',   label: 'Asset Management',   Icon: Laptop },
+  { key: 'it-websites', label: 'Website Management', Icon: Globe },
 ];
 
 export default function IT({ activeSub = "network", onSubChange }) {
@@ -32,62 +33,151 @@ export default function IT({ activeSub = "network", onSubChange }) {
 
 // ── IT Asset Management ──────────────────────────────────────────────────────
 
-const INIT_ASSETS = [
-  { id: 'A001', name: 'Dell XPS 15 Laptop',         category: 'Laptop',   assignee: 'Visesh Lodha',    dept: 'IT',          location: 'Main Office',       status: 'Active',      purchased: '2024-03-10', warrantyEnd: '2027-03-10' },
-  { id: 'A002', name: 'MacBook Pro 14" M3',          category: 'Laptop',   assignee: 'Sarah Johnson',   dept: 'Accounting',  location: 'Main Office',       status: 'Active',      purchased: '2024-06-01', warrantyEnd: '2027-06-01' },
-  { id: 'A003', name: 'Dell UltraSharp 27" Monitor', category: 'Monitor',  assignee: 'Michael Chen',    dept: 'Development', location: 'Dev Floor',         status: 'Active',      purchased: '2023-11-15', warrantyEnd: '2026-11-15' },
-  { id: 'A004', name: 'HP ProDesk 600 G9 Desktop',   category: 'Desktop',  assignee: 'Reception Desk',  dept: 'Admin',       location: 'Front Lobby',       status: 'Active',      purchased: '2023-08-20', warrantyEnd: '2026-08-20' },
-  { id: 'A005', name: 'Cisco Catalyst 2960 Switch',  category: 'Network',  assignee: 'IT Rack',         dept: 'IT',          location: 'Server Room',       status: 'Active',      purchased: '2022-05-01', warrantyEnd: '2025-05-01' },
-  { id: 'A006', name: 'Synology DS1823xs+ NAS',      category: 'Server',   assignee: 'IT Infrastructure',dept: 'IT',         location: 'Server Room',       status: 'Active',      purchased: '2023-02-14', warrantyEnd: '2026-02-14' },
-  { id: 'A007', name: 'iPhone 15 Pro',               category: 'Phone',    assignee: 'Robert Kim',      dept: 'OPS',         location: 'Field',             status: 'Active',      purchased: '2024-01-08', warrantyEnd: '2025-01-08' },
-  { id: 'A008', name: 'iPad Pro 12.9" Gen 6',        category: 'Tablet',   assignee: 'Marcus Vance',    dept: 'OPS',         location: 'Field',             status: 'Active',      purchased: '2023-09-22', warrantyEnd: '2024-09-22' },
-  { id: 'A009', name: 'Logitech MX Keys Keyboard',   category: 'Peripheral',assignee: 'Dev Team Pool',  dept: 'Development', location: 'Dev Floor',         status: 'In Storage',  purchased: '2024-02-28', warrantyEnd: '2026-02-28' },
-  { id: 'A010', name: 'APC Smart-UPS 1500VA',        category: 'Power',    assignee: 'IT Rack',         dept: 'IT',          location: 'Server Room',       status: 'Active',      purchased: '2022-11-01', warrantyEnd: '2025-11-01' },
-];
-
 const ASSET_CATEGORIES = ['All', 'Laptop', 'Desktop', 'Monitor', 'Phone', 'Tablet', 'Server', 'Network', 'Peripheral', 'Power'];
 const TODAY_DATE = new Date('2026-05-28');
 
-function ITAssets() {
-  const [assets, setAssets] = useState(INIT_ASSETS);
-  const [filter, setFilter] = useState('All');
-  const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState({ name: '', category: 'Laptop', assignee: '', dept: 'IT', location: '', status: 'Active', purchased: '', warrantyEnd: '' });
+const ASSET_STATUS_BADGE = (s) => {
+  if (s === 'Available')     return 'status-approved';
+  if (s === 'Checked Out')   return 'status-badge';
+  if (s === 'Return Pending') return 'status-pending';
+  if (s === 'Damaged' || s === 'Retired' || s === 'Lost') return 'status-rejected';
+  if (s === 'Under Repair')  return 'status-pending';
+  return 'status-pending';
+};
 
-  const visible = filter === 'All' ? assets : assets.filter(a => a.category === filter);
+function ITAssets() {
+  const {
+    hwAssets, requisitions, addHwAsset, exportToCsv,
+    pendingAllocationCount, allocateAsset, initiateReturn, confirmReturn, markAssetLost,
+  } = useRequisitions();
+
+  const [innerTab,    setInnerTab]    = useState('inventory');
+  const [filter,      setFilter]      = useState('All');
+  const [showModal,   setShowModal]   = useState(false);
+  const [form,        setForm]        = useState({ name: '', category: 'Laptop', serialNumber: '', assignedTo: 'Unassigned', dept: 'IT', location: '', status: 'Available', purchased: '', warrantyEnd: '' });
+
+  // Allocation modal state
+  const [allocModal,      setAllocModal]      = useState(null); // requisition object
+  const [allocAssetId,    setAllocAssetId]    = useState('');
+  const [allocReturnDate, setAllocReturnDate] = useState('');
+  const [allocSupervisor, setAllocSupervisor] = useState('');
+
+  // Return confirmation modal state
+  const [returnModal,      setReturnModal]      = useState(null); // asset object
+  const [returnSupervisor, setReturnSupervisor] = useState('');
+  const [returnCondition,  setReturnCondition]  = useState('Available');
+
+  // Lost asset modal state
+  const [lostModal,      setLostModal]      = useState(null); // asset object
+  const [lostSupervisor, setLostSupervisor] = useState('');
+  const [lostNotes,      setLostNotes]      = useState('');
 
   const warrantyAlert = (end) => {
     const days = Math.ceil((new Date(end) - TODAY_DATE) / (1000 * 3600 * 24));
     return { expired: days < 0, expiring: days >= 0 && days <= 90, days };
   };
 
-  const submit = (e) => {
+  const visible = filter === 'All' ? hwAssets : hwAssets.filter(a => a.category === filter);
+
+  // Pending allocation: approved requisitions waiting for asset
+  const pendingAlloc = requisitions.filter(r => r.status === 'manager_approved');
+
+  // Return pending: assets in return_initiated status
+  const returnPending = requisitions.filter(r => r.status === 'return_initiated');
+
+  // Available assets for allocation
+  const availableAssets = hwAssets.filter(a => a.status === 'Available');
+
+  // Summary counts
+  const totalCount    = hwAssets.length;
+  const availCount    = hwAssets.filter(a => a.status === 'Available').length;
+  const checkedCount  = hwAssets.filter(a => a.status === 'Checked Out').length;
+  const warrantyCount = hwAssets.filter(a => { const w = warrantyAlert(a.warrantyEnd || '2099-01-01'); return w.expiring || w.expired; }).length;
+
+  const submitAddAsset = (e) => {
     e.preventDefault();
-    const id = `A${String(assets.length + 1).padStart(3, '0')}`;
-    setAssets(prev => [{ id, ...form }, ...prev]);
+    addHwAsset(form);
     setShowModal(false);
-    setForm({ name: '', category: 'Laptop', assignee: '', dept: 'IT', location: '', status: 'Active', purchased: '', warrantyEnd: '' });
+    setForm({ name: '', category: 'Laptop', serialNumber: '', assignedTo: 'Unassigned', dept: 'IT', location: '', status: 'Available', purchased: '', warrantyEnd: '' });
   };
+
+  const openAllocModal = (req) => {
+    setAllocModal(req);
+    setAllocAssetId('');
+    setAllocReturnDate('');
+    setAllocSupervisor(req.supervisorName || '');
+  };
+
+  const handleAllocate = () => {
+    if (!allocAssetId || !allocSupervisor.trim()) return;
+    const ok = allocateAsset(allocModal.id, allocAssetId, allocSupervisor.trim(), allocReturnDate);
+    if (ok) setAllocModal(null);
+  };
+
+  const openReturnModal = (asset) => {
+    setReturnModal(asset);
+    setReturnSupervisor('IT Supervisor');
+    setReturnCondition('Available');
+  };
+
+  const handleConfirmReturn = () => {
+    if (!returnModal || !returnSupervisor.trim()) return;
+    const req = requisitions.find(r => r.id === returnModal.assignedReqId || (r.assetId === returnModal.id && r.status === 'return_initiated'));
+    if (req) confirmReturn(req.id, returnSupervisor.trim(), returnCondition);
+    setReturnModal(null);
+  };
+
+  const handleInitiateReturn = (asset) => {
+    const req = requisitions.find(r => r.assetId === asset.id && r.status === 'asset_allocated');
+    if (req) initiateReturn(req.id, 'IT Supervisor');
+  };
+
+  const openLostModal = (asset) => {
+    setLostModal(asset);
+    setLostSupervisor('IT Supervisor');
+    setLostNotes('');
+  };
+
+  const handleMarkLost = () => {
+    if (!lostModal) return;
+    const req = requisitions.find(r => r.assetId === lostModal.id && ['asset_allocated','return_initiated'].includes(r.status));
+    if (req) markAssetLost(req.id, lostSupervisor.trim(), lostNotes);
+    setLostModal(null);
+  };
+
+  const fmtDate = (iso) => iso ? (iso.includes('T') ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : iso) : '—';
+
+  const innerTabs = [
+    { id: 'inventory',   label: 'Asset Inventory' },
+    { id: 'allocation',  label: `Pending Allocation${pendingAllocationCount > 0 ? ` (${pendingAllocationCount})` : ''}` },
+    { id: 'returns',     label: `Return Confirmations${returnPending.length > 0 ? ` (${returnPending.length})` : ''}` },
+  ];
 
   return (
     <div>
+      {/* View Header */}
       <div className="view-header">
         <div className="view-title-group">
           <h2>IT Asset Management</h2>
-          <p>Track hardware, devices, and equipment across all departments</p>
+          <p>Track hardware, devices, and equipment — allocate, return, and manage asset lifecycle</p>
         </div>
-        <button className="primary-btn" onClick={() => setShowModal(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          <Plus size={14} /> Add Asset
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="secondary-btn" onClick={exportToCsv} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <FileText size={14} /> Export CSV
+          </button>
+          <button className="primary-btn" onClick={() => setShowModal(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <Plus size={14} /> Add Asset
+          </button>
+        </div>
       </div>
 
       {/* Summary cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12, marginBottom: 20 }}>
         {[
-          { label: 'Total Assets',   value: assets.length,                                         color: 'hsl(var(--color-blue))' },
-          { label: 'Active',         value: assets.filter(a => a.status === 'Active').length,       color: 'hsl(var(--color-green))' },
-          { label: 'In Storage',     value: assets.filter(a => a.status === 'In Storage').length,   color: 'var(--text-secondary)' },
-          { label: 'Warranty Expiring', value: assets.filter(a => { const w = warrantyAlert(a.warrantyEnd); return w.expiring || w.expired; }).length, color: 'hsl(var(--color-orange))' },
+          { label: 'Total Assets',      value: totalCount,    color: 'hsl(var(--color-blue))' },
+          { label: 'Available',         value: availCount,    color: 'hsl(var(--color-green))' },
+          { label: 'Checked Out',       value: checkedCount,  color: 'hsl(var(--color-orange))' },
+          { label: 'Warranty Expiring', value: warrantyCount, color: 'hsl(var(--color-red))' },
         ].map(s => (
           <div key={s.label} style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 10, padding: '16px 18px' }}>
             <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', marginBottom: 6 }}>{s.label}</div>
@@ -96,63 +186,358 @@ function ITAssets() {
         ))}
       </div>
 
-      {/* Category filter */}
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
-        {ASSET_CATEGORIES.map(c => (
-          <button key={c} onClick={() => setFilter(c)}
-            style={{ padding: '4px 12px', borderRadius: 20, border: '1px solid var(--border-color)', background: filter === c ? 'var(--text-primary)' : 'var(--bg-card)', color: filter === c ? 'var(--bg-primary)' : 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: 500, cursor: 'pointer' }}>
-            {c}
+      {/* Inner tab navigation */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
+        {innerTabs.map(t => (
+          <button key={t.id} onClick={() => setInnerTab(t.id)}
+            style={{
+              padding: '5px 14px', borderRadius: 20, border: '1px solid var(--border-color)',
+              background: innerTab === t.id ? 'var(--text-primary)' : 'var(--bg-card)',
+              color: innerTab === t.id ? 'var(--bg-primary)' : 'var(--text-secondary)',
+              fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer',
+            }}>
+            {t.label}
           </button>
         ))}
       </div>
 
-      {/* Table */}
-      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 10, overflow: 'hidden' }}>
-        <table className="req-table">
-          <thead>
-            <tr><th>Asset ID</th><th>Name / Category</th><th>Assigned To</th><th>Location</th><th>Warranty</th><th>Status</th></tr>
-          </thead>
-          <tbody>
-            {visible.map(a => {
-              const w = warrantyAlert(a.warrantyEnd);
-              return (
-                <tr key={a.id}>
-                  <td style={{ fontFamily: 'monospace', fontSize: '0.82rem', color: 'var(--text-muted)' }}>{a.id}</td>
-                  <td>
-                    <div style={{ fontWeight: 600 }}>{a.name}</div>
-                    <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{a.category} · {a.dept}</div>
-                  </td>
-                  <td>{a.assignee}</td>
-                  <td style={{ color: 'var(--text-secondary)', fontSize: '0.88rem' }}>{a.location}</td>
-                  <td>
-                    <span style={{ fontSize: '0.82rem', color: w.expired ? 'hsl(var(--color-red))' : w.expiring ? 'hsl(var(--color-orange))' : 'var(--text-secondary)', fontWeight: w.expired || w.expiring ? 600 : 400 }}>
-                      {w.expired ? `Expired ${Math.abs(w.days)}d ago` : w.expiring ? `${w.days}d left` : a.warrantyEnd}
-                    </span>
-                  </td>
-                  <td><span className={`status-badge ${a.status === 'Active' ? 'status-approved' : 'status-pending'}`}>{a.status}</span></td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+      {/* ── Asset Inventory tab ── */}
+      {innerTab === 'inventory' && (
+        <>
+          {/* Category filter */}
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
+            {ASSET_CATEGORIES.map(c => (
+              <button key={c} onClick={() => setFilter(c)}
+                style={{ padding: '4px 12px', borderRadius: 20, border: '1px solid var(--border-color)', background: filter === c ? 'var(--text-primary)' : 'var(--bg-card)', color: filter === c ? 'var(--bg-primary)' : 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: 500, cursor: 'pointer' }}>
+                {c}
+              </button>
+            ))}
+          </div>
 
-      {/* Add Asset Modal */}
+          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 10, overflow: 'hidden' }}>
+            <table className="req-table">
+              <thead>
+                <tr>
+                  <th>Asset ID</th>
+                  <th>Name / Category</th>
+                  <th>Assigned To</th>
+                  <th>Location</th>
+                  <th>Warranty</th>
+                  <th>Status</th>
+                  <th style={{ textAlign: 'right' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visible.map(a => {
+                  const w = warrantyAlert(a.warrantyEnd || '2099-01-01');
+                  const isCheckedOut   = a.status === 'Checked Out'  && a.assignedReqId;
+                  const isReturnPending = a.status === 'Return Pending';
+                  return (
+                    <tr key={a.id}>
+                      <td style={{ fontFamily: 'monospace', fontSize: '0.82rem', color: 'var(--text-muted)' }}>{a.id}</td>
+                      <td>
+                        <div style={{ fontWeight: 600 }}>{a.name}</div>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{a.category} · {a.dept}</div>
+                      </td>
+                      <td>{a.assignedTo}</td>
+                      <td style={{ color: 'var(--text-secondary)', fontSize: '0.88rem' }}>{a.location}</td>
+                      <td>
+                        <span style={{ fontSize: '0.82rem', color: w.expired ? 'hsl(var(--color-red))' : w.expiring ? 'hsl(var(--color-orange))' : 'var(--text-secondary)', fontWeight: w.expired || w.expiring ? 600 : 400 }}>
+                          {a.warrantyEnd ? (w.expired ? `Expired ${Math.abs(w.days)}d ago` : w.expiring ? `${w.days}d left` : a.warrantyEnd) : '—'}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={`status-badge ${ASSET_STATUS_BADGE(a.status)}`}>{a.status}</span>
+                      </td>
+                      <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                        {isCheckedOut && (
+                          <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                            <button
+                              className="secondary-btn"
+                              style={{ padding: '3px 10px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                              onClick={() => handleInitiateReturn(a)}>
+                              <RotateCcw size={11} /> Return
+                            </button>
+                            <button
+                              className="secondary-btn"
+                              style={{ padding: '3px 10px', fontSize: '0.75rem', color: 'hsl(var(--color-red))', borderColor: 'hsla(var(--color-red),0.4)', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                              onClick={() => openLostModal(a)}>
+                              Lost
+                            </button>
+                          </div>
+                        )}
+                        {isReturnPending && (
+                          <button
+                            className="primary-btn"
+                            style={{ padding: '3px 12px', fontSize: '0.75rem', background: 'hsl(var(--color-blue))', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                            onClick={() => openReturnModal(a)}>
+                            <CheckCircle size={11} /> Confirm Return
+                          </button>
+                        )}
+                        {a.status === 'Available' && (
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>—</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+
+      {/* ── Pending Allocation tab ── */}
+      {innerTab === 'allocation' && (
+        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 10, overflow: 'hidden' }}>
+          {pendingAlloc.length === 0 ? (
+            <div style={{ padding: '48px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+              <Package size={28} style={{ marginBottom: 10, opacity: 0.4 }} />
+              <div>No approved requisitions awaiting asset allocation.</div>
+              <div style={{ fontSize: '0.82rem', marginTop: 6 }}>Approved requests from the Manager Dashboard will appear here.</div>
+            </div>
+          ) : (
+            <table className="req-table">
+              <thead>
+                <tr>
+                  <th>Req ID</th>
+                  <th>Item Requested</th>
+                  <th>Employee / Dept</th>
+                  <th>Qty</th>
+                  <th>Supervisor</th>
+                  <th>Manager Approved</th>
+                  <th>Available Stock</th>
+                  <th style={{ textAlign: 'right' }}>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pendingAlloc.map(req => {
+                  const matchingAvail = availableAssets.filter(a =>
+                    a.category.toLowerCase() === req.item.toLowerCase() ||
+                    a.name.toLowerCase().includes(req.item.toLowerCase())
+                  ).length;
+                  const totalAvail = availableAssets.length;
+                  return (
+                    <tr key={req.id}>
+                      <td style={{ fontFamily: 'monospace', fontSize: '0.82rem', color: 'var(--text-muted)' }}>{req.id}</td>
+                      <td>
+                        <div style={{ fontWeight: 600 }}>{req.item}</div>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Reason: {req.reason?.substring(0, 40)}{req.reason?.length > 40 ? '…' : ''}</div>
+                      </td>
+                      <td>
+                        <div style={{ fontWeight: 500 }}>{req.employeeName}</div>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{req.employeeDept}</div>
+                      </td>
+                      <td style={{ fontWeight: 600 }}>{req.quantity}</td>
+                      <td style={{ fontSize: '0.88rem' }}>{req.supervisorName}</td>
+                      <td style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>{fmtDate(req.managerApprovalDate)}</td>
+                      <td>
+                        {matchingAvail > 0
+                          ? <span style={{ color: 'hsl(var(--color-green))', fontWeight: 600, fontSize: '0.88rem' }}>{matchingAvail} matching</span>
+                          : totalAvail > 0
+                            ? <span style={{ color: 'hsl(var(--color-orange))', fontWeight: 600, fontSize: '0.88rem' }}>{totalAvail} other</span>
+                            : <span style={{ color: 'hsl(var(--color-red))', fontWeight: 600, fontSize: '0.88rem' }}>None available</span>
+                        }
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        <button
+                          className="primary-btn"
+                          style={{ padding: '5px 14px', fontSize: '0.82rem', display: 'inline-flex', alignItems: 'center', gap: 5 }}
+                          onClick={() => openAllocModal(req)}>
+                          <Package size={13} /> Allocate Asset
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+
+      {/* ── Return Confirmations tab ── */}
+      {innerTab === 'returns' && (
+        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 10, overflow: 'hidden' }}>
+          {returnPending.length === 0 ? (
+            <div style={{ padding: '48px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+              <RotateCcw size={28} style={{ marginBottom: 10, opacity: 0.4 }} />
+              <div>No pending return confirmations.</div>
+            </div>
+          ) : (
+            <table className="req-table">
+              <thead>
+                <tr>
+                  <th>Req ID</th>
+                  <th>Asset</th>
+                  <th>Employee</th>
+                  <th>Allocated Date</th>
+                  <th>Expected Return</th>
+                  <th style={{ textAlign: 'right' }}>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {returnPending.map(req => {
+                  const asset = hwAssets.find(a => a.id === req.assetId);
+                  return (
+                    <tr key={req.id}>
+                      <td style={{ fontFamily: 'monospace', fontSize: '0.82rem', color: 'var(--text-muted)' }}>{req.id}</td>
+                      <td>
+                        <div style={{ fontWeight: 600 }}>{req.assetName}</div>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{req.assetSerial}</div>
+                      </td>
+                      <td>
+                        <div style={{ fontWeight: 500 }}>{req.employeeName}</div>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{req.employeeDept}</div>
+                      </td>
+                      <td style={{ fontSize: '0.85rem' }}>{fmtDate(req.assetAllocatedDate)}</td>
+                      <td style={{ fontSize: '0.85rem' }}>{req.expectedReturnDate || '—'}</td>
+                      <td style={{ textAlign: 'right' }}>
+                        <button
+                          className="primary-btn"
+                          style={{ padding: '5px 14px', fontSize: '0.82rem', background: 'hsl(var(--color-blue))', display: 'inline-flex', alignItems: 'center', gap: 5 }}
+                          onClick={() => openReturnModal(asset)}>
+                          <CheckCircle size={13} /> Confirm Return
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+
+      {/* ── Allocation Modal ── */}
+      {allocModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 14, padding: 28, width: 520, maxHeight: '90vh', overflowY: 'auto' }}>
+            <h3 style={{ marginBottom: 4, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Allocate Asset</h3>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', marginBottom: 20 }}>
+              Assigning to <strong>{allocModal.employeeName}</strong> ({allocModal.employeeDept}) — requested: <strong>{allocModal.item} × {allocModal.quantity}</strong>
+            </p>
+
+            <div style={{ display: 'grid', gap: 14 }}>
+              <div className="form-group">
+                <label>Select Available Asset</label>
+                <select className="form-select" value={allocAssetId} onChange={e => setAllocAssetId(e.target.value)} required>
+                  <option value="">— Select asset —</option>
+                  {availableAssets.map(a => (
+                    <option key={a.id} value={a.id}>{a.id} · {a.name} [{a.category}] @ {a.location}</option>
+                  ))}
+                </select>
+                {availableAssets.length === 0 && (
+                  <p style={{ color: 'hsl(var(--color-orange))', fontSize: '0.8rem', marginTop: 4 }}>⚠ No assets currently available. The requisition will remain pending.</p>
+                )}
+              </div>
+
+              <div className="form-group">
+                <label>Expected Return Date</label>
+                <input type="date" className="form-input" value={allocReturnDate} onChange={e => setAllocReturnDate(e.target.value)} />
+              </div>
+
+              <div className="form-group">
+                <label>Allocating Supervisor</label>
+                <input type="text" className="form-input" placeholder="Supervisor name" value={allocSupervisor} onChange={e => setAllocSupervisor(e.target.value)} required />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, marginTop: 22, justifyContent: 'flex-end' }}>
+              <button className="secondary-btn" onClick={() => setAllocModal(null)}>Cancel</button>
+              <button
+                className="primary-btn"
+                onClick={handleAllocate}
+                disabled={!allocAssetId || !allocSupervisor.trim()}>
+                <CheckCircle size={14} /> Confirm Allocation
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Return Confirmation Modal ── */}
+      {returnModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 14, padding: 28, width: 440 }}>
+            <h3 style={{ marginBottom: 4, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Confirm Asset Return</h3>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', marginBottom: 20 }}>
+              <strong>{returnModal?.name}</strong> — returned by <strong>{returnModal?.assignedTo}</strong>
+            </p>
+
+            <div style={{ display: 'grid', gap: 14 }}>
+              <div className="form-group">
+                <label>Asset Condition</label>
+                <select className="form-select" value={returnCondition} onChange={e => setReturnCondition(e.target.value)}>
+                  <option value="Available">Available (Good Condition)</option>
+                  <option value="Damaged">Damaged</option>
+                  <option value="Under Repair">Under Repair</option>
+                  <option value="Retired">Retired (End of Life)</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Confirmed By (Supervisor)</label>
+                <input type="text" className="form-input" value={returnSupervisor} onChange={e => setReturnSupervisor(e.target.value)} />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, marginTop: 22, justifyContent: 'flex-end' }}>
+              <button className="secondary-btn" onClick={() => setReturnModal(null)}>Cancel</button>
+              <button className="primary-btn" onClick={handleConfirmReturn} disabled={!returnSupervisor.trim()}>
+                <CheckCircle size={14} /> Confirm Return
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Mark Lost Modal ── */}
+      {lostModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 14, padding: 28, width: 440 }}>
+            <h3 style={{ marginBottom: 4, fontFamily: "'Plus Jakarta Sans', sans-serif", color: 'hsl(var(--color-red))' }}>Mark Asset as Lost</h3>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', marginBottom: 20 }}>
+              <strong>{lostModal?.name}</strong> assigned to <strong>{lostModal?.assignedTo}</strong>
+            </p>
+
+            <div style={{ display: 'grid', gap: 14 }}>
+              <div className="form-group">
+                <label>Notes</label>
+                <textarea className="form-input" rows={3} placeholder="Describe circumstances of loss..." value={lostNotes} onChange={e => setLostNotes(e.target.value)} style={{ resize: 'vertical' }} />
+              </div>
+              <div className="form-group">
+                <label>Reported By (Supervisor)</label>
+                <input type="text" className="form-input" value={lostSupervisor} onChange={e => setLostSupervisor(e.target.value)} />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, marginTop: 22, justifyContent: 'flex-end' }}>
+              <button className="secondary-btn" onClick={() => setLostModal(null)}>Cancel</button>
+              <button className="primary-btn" style={{ background: 'hsl(var(--color-red))' }} onClick={handleMarkLost} disabled={!lostSupervisor.trim()}>
+                Mark as Lost
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Add Asset Modal ── */}
       {showModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
           <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 12, padding: 28, width: 480, maxHeight: '90vh', overflowY: 'auto' }}>
             <h3 style={{ marginBottom: 20, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Add New Asset</h3>
-            <form onSubmit={submit}>
+            <form onSubmit={submitAddAsset}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                 {[
-                  { label: 'Asset Name', key: 'name', type: 'text', full: true },
-                  { label: 'Category', key: 'category', type: 'select', options: ASSET_CATEGORIES.slice(1) },
-                  { label: 'Assigned To', key: 'assignee', type: 'text' },
-                  { label: 'Department', key: 'dept', type: 'text' },
-                  { label: 'Location', key: 'location', type: 'text' },
-                  { label: 'Status', key: 'status', type: 'select', options: ['Active', 'In Storage', 'Decommissioned'] },
-                  { label: 'Purchase Date', key: 'purchased', type: 'date' },
-                  { label: 'Warranty End', key: 'warrantyEnd', type: 'date' },
+                  { label: 'Asset Name',    key: 'name',         type: 'text',   full: true },
+                  { label: 'Category',      key: 'category',     type: 'select', options: ASSET_CATEGORIES.slice(1) },
+                  { label: 'Serial Number', key: 'serialNumber', type: 'text' },
+                  { label: 'Assigned To',   key: 'assignedTo',   type: 'text' },
+                  { label: 'Department',    key: 'dept',         type: 'text' },
+                  { label: 'Location',      key: 'location',     type: 'text' },
+                  { label: 'Status',        key: 'status',       type: 'select', options: ['Available', 'Checked Out', 'In Storage', 'Under Repair', 'Retired'] },
+                  { label: 'Purchase Date', key: 'purchased',    type: 'date' },
+                  { label: 'Warranty End',  key: 'warrantyEnd',  type: 'date' },
                 ].map(f => (
                   <div key={f.key} className="form-group" style={f.full ? { gridColumn: '1/-1' } : {}}>
                     <label>{f.label}</label>
@@ -160,7 +545,7 @@ function ITAssets() {
                       ? <select className="form-select" value={form[f.key]} onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}>
                           {f.options.map(o => <option key={o}>{o}</option>)}
                         </select>
-                      : <input className="form-input" type={f.type} required value={form[f.key]} onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))} />
+                      : <input className="form-input" type={f.type} required={f.key !== 'serialNumber'} value={form[f.key]} onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))} />
                     }
                   </div>
                 ))}
@@ -180,11 +565,11 @@ function ITAssets() {
 // ── Website Management ───────────────────────────────────────────────────────
 
 const INIT_SITES = [
-  { id: 1, name: 'Greens Global',        url: 'https://greensglobal.com',       platform: 'WordPress',  hosting: 'WP Engine',    domainExpiry: '2027-01-14', sslExpiry: '2026-08-01', status: 'Live',       analytics: '4,280 visits/mo' },
-  { id: 2, name: 'Greens Nexus App',     url: 'https://vlow2k.github.io/Greens-Nexus', platform: 'React/Vite', hosting: 'GitHub Pages', domainExpiry: '—',         sslExpiry: 'Auto',       status: 'Live',       analytics: 'Internal' },
-  { id: 3, name: 'Greens Global Ads LP', url: 'https://greensglobal.com/promo', platform: 'WordPress',  hosting: 'WP Engine',    domainExpiry: '2027-01-14', sslExpiry: '2026-08-01', status: 'Live',       analytics: '1,050 visits/mo' },
+  { id: 1, name: 'Greens Global',        url: 'https://greensglobal.com',       platform: 'WordPress',  hosting: 'WP Engine',    domainExpiry: '2027-01-14', sslExpiry: '2026-08-01', status: 'Live',           analytics: '4,280 visits/mo' },
+  { id: 2, name: 'Greens Nexus App',     url: 'https://vlow2k.github.io/Greens-Nexus', platform: 'React/Vite', hosting: 'GitHub Pages', domainExpiry: '—',         sslExpiry: 'Auto',       status: 'Live',           analytics: 'Internal' },
+  { id: 3, name: 'Greens Global Ads LP', url: 'https://greensglobal.com/promo', platform: 'WordPress',  hosting: 'WP Engine',    domainExpiry: '2027-01-14', sslExpiry: '2026-08-01', status: 'Live',           analytics: '1,050 visits/mo' },
   { id: 4, name: 'Investor Portal',      url: 'https://investors.greensglobal.com', platform: 'Custom',  hosting: 'AWS',          domainExpiry: '2027-01-14', sslExpiry: '2026-11-20', status: 'In Development', analytics: '—' },
-  { id: 5, name: 'OPS Field App',        url: 'https://ops.greensglobal.com',   platform: 'React',      hosting: 'Render',       domainExpiry: '2027-01-14', sslExpiry: 'Auto',       status: 'Staging',    analytics: 'Internal' },
+  { id: 5, name: 'OPS Field App',        url: 'https://ops.greensglobal.com',   platform: 'React',      hosting: 'Render',       domainExpiry: '2027-01-14', sslExpiry: 'Auto',       status: 'Staging',        analytics: 'Internal' },
 ];
 
 function ITWebsites() {
@@ -275,7 +660,6 @@ function ITWebsites() {
         })}
       </div>
 
-      {/* Add Site Modal */}
       {showModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
           <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 12, padding: 28, width: 480, maxHeight: '90vh', overflowY: 'auto' }}>
@@ -402,25 +786,16 @@ function NetworkDashboard() {
     a.click();
   }
 
-  const allOffline = sites.flatMap(s =>
-    s.offline_devices.map(d => ({ ...d, siteName: s.name, siteId: s.siteId }))
-  );
-  const allOutdated = sites.flatMap(s =>
-    s.outdated_devices.map(d => ({ ...d, siteName: s.name, siteId: s.siteId }))
-  );
+  const allOffline  = sites.flatMap(s => s.offline_devices.map(d => ({ ...d, siteName: s.name, siteId: s.siteId })));
+  const allOutdated = sites.flatMap(s => s.outdated_devices.map(d => ({ ...d, siteName: s.name, siteId: s.siteId })));
   const totalAlerts = allOffline.length + allOutdated.length;
 
   return (
     <div>
-      {/* Header */}
       <div className="view-header">
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           {view === "detail" && (
-            <button
-              className="secondary-btn"
-              style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
-              onClick={backToOverview}
-            >
+            <button className="secondary-btn" style={{ display: "inline-flex", alignItems: "center", gap: 6 }} onClick={backToOverview}>
               <ArrowLeft style={{ width: 14, height: 14 }} /> Overview
             </button>
           )}
@@ -429,61 +804,39 @@ function NetworkDashboard() {
             <p>{view === "overview" ? "UniFi site overview — devices, clients, and alerts" : "Site devices, clients, and statistics"}</p>
           </div>
         </div>
-
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          {lastUpdated && (
-            <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>Updated {lastUpdated}</span>
-          )}
+          {lastUpdated && <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>Updated {lastUpdated}</span>}
           {view === "detail" && (
-            <button
-              className="secondary-btn"
-              style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
-              onClick={exportCSV}
-            >
+            <button className="secondary-btn" style={{ display: "inline-flex", alignItems: "center", gap: 6 }} onClick={exportCSV}>
               <Download style={{ width: 14, height: 14 }} /> Export CSV
             </button>
           )}
-          <button
-            className="secondary-btn"
-            style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
-            onClick={() => view === "overview" ? loadOverview() : loadDetail(currentSite.siteId)}
-            disabled={loading}
-          >
+          <button className="secondary-btn" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+            onClick={() => view === "overview" ? loadOverview() : loadDetail(currentSite.siteId)} disabled={loading}>
             <RefreshCw style={{ width: 14, height: 14, animation: loading ? "spin 1s linear infinite" : "none" }} />
             {loading ? "Loading..." : "Refresh"}
           </button>
         </div>
       </div>
 
-      {/* Error */}
       {error && (
         <div style={{ background: "hsla(0,80%,50%,0.08)", border: "1px solid hsla(0,80%,50%,0.25)", color: "hsl(var(--color-red))", borderRadius: 8, padding: "12px 16px", marginBottom: 20, fontSize: "0.875rem" }}>
           ⚠ {error}
         </div>
       )}
 
-      {/* ── OVERVIEW ── */}
       {view === "overview" && (
         <>
-          {/* Alert banner */}
           {totalAlerts > 0 && (
             <div style={{ background: "hsla(38,90%,50%,0.08)", border: "1px solid hsla(38,90%,50%,0.25)", borderRadius: 8, marginBottom: 20, overflow: "hidden" }}>
-              <div
-                style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 16px", cursor: "pointer", userSelect: "none" }}
-                onClick={() => setAlertsOpen(o => !o)}
-              >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 16px", cursor: "pointer", userSelect: "none" }} onClick={() => setAlertsOpen(o => !o)}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, color: "hsl(var(--color-orange))", fontSize: "0.82rem", fontWeight: 600 }}>
                   <AlertTriangle style={{ width: 14, height: 14 }} />
                   {[allOffline.length && `${allOffline.length} OFFLINE`, allOutdated.length && `${allOutdated.length} FIRMWARE UPDATES`].filter(Boolean).join(" · ")}
-                  <span style={{ background: "hsl(var(--color-orange))", color: "#000", fontSize: "0.7rem", fontWeight: 700, padding: "1px 7px", borderRadius: 10 }}>
-                    {totalAlerts}
-                  </span>
+                  <span style={{ background: "hsl(var(--color-orange))", color: "#000", fontSize: "0.7rem", fontWeight: 700, padding: "1px 7px", borderRadius: 10 }}>{totalAlerts}</span>
                 </div>
-                {alertsOpen
-                  ? <ChevronUp style={{ width: 14, height: 14, color: "hsl(var(--color-orange))" }} />
-                  : <ChevronDown style={{ width: 14, height: 14, color: "hsl(var(--color-orange))" }} />}
+                {alertsOpen ? <ChevronUp style={{ width: 14, height: 14, color: "hsl(var(--color-orange))" }} /> : <ChevronDown style={{ width: 14, height: 14, color: "hsl(var(--color-orange))" }} />}
               </div>
-
               {alertsOpen && (
                 <div style={{ borderTop: "1px solid hsla(38,90%,50%,0.15)" }}>
                   {allOffline.length > 0 && <>
@@ -493,8 +846,7 @@ function NetworkDashboard() {
                         <div style={{ width: 5, height: 5, borderRadius: "50%", background: "hsl(var(--color-red))", flexShrink: 0 }} />
                         <span style={{ fontWeight: 600 }}>{d.name}</span>
                         <span style={{ color: "var(--text-secondary)" }}>{d.model}</span>
-                        <button className="secondary-btn" style={{ marginLeft: "auto", padding: "2px 8px", fontSize: "0.7rem" }}
-                          onClick={() => openDetail({ siteId: d.siteId, name: d.siteName })}>{d.siteName}</button>
+                        <button className="secondary-btn" style={{ marginLeft: "auto", padding: "2px 8px", fontSize: "0.7rem" }} onClick={() => openDetail({ siteId: d.siteId, name: d.siteName })}>{d.siteName}</button>
                       </div>
                     ))}
                   </>}
@@ -505,8 +857,7 @@ function NetworkDashboard() {
                         <div style={{ width: 5, height: 5, borderRadius: "50%", background: "hsl(var(--color-orange))", flexShrink: 0 }} />
                         <span style={{ fontWeight: 600 }}>{d.name}</span>
                         <span style={{ color: "var(--text-secondary)" }}>{d.model} · v{d.version}</span>
-                        <button className="secondary-btn" style={{ marginLeft: "auto", padding: "2px 8px", fontSize: "0.7rem" }}
-                          onClick={() => openDetail({ siteId: d.siteId, name: d.siteName })}>{d.siteName}</button>
+                        <button className="secondary-btn" style={{ marginLeft: "auto", padding: "2px 8px", fontSize: "0.7rem" }} onClick={() => openDetail({ siteId: d.siteId, name: d.siteName })}>{d.siteName}</button>
                       </div>
                     ))}
                   </>}
@@ -515,7 +866,6 @@ function NetworkDashboard() {
             </div>
           )}
 
-          {/* Site cards */}
           {sites.length === 0 && loading && (
             <div style={{ textAlign: "center", padding: 60, color: "var(--text-secondary)" }}>
               <RefreshCw style={{ width: 20, height: 20, animation: "spin 1s linear infinite", marginBottom: 12 }} />
@@ -531,61 +881,37 @@ function NetworkDashboard() {
           {sites.length > 0 && (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
               {sites.map(site => {
-                const hasOffline = site.offline_devices.length > 0;
+                const hasOffline  = site.offline_devices.length > 0;
                 const hasOutdated = site.outdated_devices.length > 0;
                 const dotColor = hasOffline ? "hsl(var(--color-red))" : hasOutdated ? "hsl(var(--color-orange))" : "hsl(var(--color-green))";
                 return (
-                  <div
-                    key={site.siteId}
-                    onClick={() => openDetail(site)}
-                    style={{
-                      background: "var(--bg-card)",
-                      border: `1px solid ${hasOffline ? "hsla(0,80%,50%,0.3)" : "var(--border-color)"}`,
-                      borderRadius: 12,
-                      padding: 20,
-                      cursor: "pointer",
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 14,
-                      transition: "border-color 0.15s, box-shadow 0.15s",
-                    }}
+                  <div key={site.siteId} onClick={() => openDetail(site)}
+                    style={{ background: "var(--bg-card)", border: `1px solid ${hasOffline ? "hsla(0,80%,50%,0.3)" : "var(--border-color)"}`, borderRadius: 12, padding: 20, cursor: "pointer", display: "flex", flexDirection: "column", gap: 14, transition: "border-color 0.15s, box-shadow 0.15s" }}
                     onMouseEnter={e => e.currentTarget.style.boxShadow = "var(--shadow-md, 0 4px 12px rgba(0,0,0,0.1))"}
-                    onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}
-                  >
+                    onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                       <span style={{ fontWeight: 700, fontSize: "0.95rem" }}>{site.name}</span>
                       <div style={{ width: 8, height: 8, borderRadius: "50%", background: dotColor, boxShadow: `0 0 6px ${dotColor}`, marginTop: 5, flexShrink: 0 }} />
                     </div>
-
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                       <div>
                         <div style={{ fontSize: "0.68rem", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--text-muted)", marginBottom: 4 }}>Devices</div>
                         <div style={{ fontSize: "1.75rem", fontWeight: 700, lineHeight: 1, color: hasOffline ? "hsl(var(--color-red))" : "hsl(var(--color-green))" }}>
-                          {site.online_devices}
-                          <span style={{ fontSize: "0.9rem", color: "var(--text-muted)", fontWeight: 400 }}>/{site.total_devices}</span>
+                          {site.online_devices}<span style={{ fontSize: "0.9rem", color: "var(--text-muted)", fontWeight: 400 }}>/{site.total_devices}</span>
                         </div>
                         <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginTop: 3 }}>online</div>
                       </div>
                       <div>
                         <div style={{ fontSize: "0.68rem", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--text-muted)", marginBottom: 4 }}>Clients</div>
-                        <div style={{ fontSize: "1.75rem", fontWeight: 700, lineHeight: 1, color: "hsl(var(--color-blue))" }}>
-                          {site.wifi_clients + site.wired_clients}
-                        </div>
-                        <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginTop: 3 }}>
-                          {site.wifi_clients} WiFi · {site.wired_clients} wired
-                        </div>
+                        <div style={{ fontSize: "1.75rem", fontWeight: 700, lineHeight: 1, color: "hsl(var(--color-blue))" }}>{site.wifi_clients + site.wired_clients}</div>
+                        <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginTop: 3 }}>{site.wifi_clients} WiFi · {site.wired_clients} wired</div>
                       </div>
                     </div>
-
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: 12, borderTop: "1px solid var(--border-color)" }}>
                       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-                        {hasOffline && <span className="status-badge status-rejected" style={{ fontSize: "0.68rem" }}>{site.offline_devices.length} OFFLINE</span>}
+                        {hasOffline  && <span className="status-badge status-rejected" style={{ fontSize: "0.68rem" }}>{site.offline_devices.length} OFFLINE</span>}
                         {hasOutdated && <span className="status-badge" style={{ background: "hsla(38,90%,50%,0.12)", color: "hsl(var(--color-orange))", fontSize: "0.68rem" }}>{site.outdated_devices.length} FIRMWARE</span>}
-                        {site.wan_uptime > 0 && (
-                          <span style={{ fontSize: "0.75rem", color: site.wan_uptime < 95 ? "hsl(var(--color-orange))" : "hsl(var(--color-green))" }}>
-                            WAN {site.wan_uptime}%
-                          </span>
-                        )}
+                        {site.wan_uptime > 0 && <span style={{ fontSize: "0.75rem", color: site.wan_uptime < 95 ? "hsl(var(--color-orange))" : "hsl(var(--color-green))" }}>WAN {site.wan_uptime}%</span>}
                       </div>
                       <span style={{ fontSize: "0.75rem", color: "hsl(var(--color-blue))", fontWeight: 600 }}>VIEW →</span>
                     </div>
@@ -597,24 +923,19 @@ function NetworkDashboard() {
         </>
       )}
 
-      {/* ── DETAIL ── */}
       {view === "detail" && (
         <>
-          {!detail && loading && (
-            <div style={{ padding: 60, textAlign: "center", color: "var(--text-secondary)" }}>Loading site data...</div>
-          )}
-
+          {!detail && loading && <div style={{ padding: 60, textAlign: "center", color: "var(--text-secondary)" }}>Loading site data...</div>}
           {detail && (
             <>
-              {/* Stats strip */}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 1, background: "var(--border-color)", border: "1px solid var(--border-color)", borderRadius: 10, overflow: "hidden", marginBottom: 28 }}>
                 {[
-                  { label: "Total Devices", value: detail.total_devices, color: "hsl(var(--color-blue))" },
-                  { label: "Online",         value: detail.online_devices, color: "hsl(var(--color-green))" },
-                  { label: "Offline",        value: detail.offline_devices, color: detail.offline_devices > 0 ? "hsl(var(--color-red))" : "var(--text-secondary)" },
-                  { label: "Total Clients",  value: detail.total_clients, color: "hsl(var(--color-blue))" },
-                  { label: "Wireless",       value: detail.wireless_clients, color: "var(--text-primary)" },
-                  { label: "Wired",          value: detail.wired_clients, color: "var(--text-primary)" },
+                  { label: "Total Devices", value: detail.total_devices,    color: "hsl(var(--color-blue))" },
+                  { label: "Online",        value: detail.online_devices,   color: "hsl(var(--color-green))" },
+                  { label: "Offline",       value: detail.offline_devices,  color: detail.offline_devices > 0 ? "hsl(var(--color-red))" : "var(--text-secondary)" },
+                  { label: "Total Clients", value: detail.total_clients,    color: "hsl(var(--color-blue))" },
+                  { label: "Wireless",      value: detail.wireless_clients, color: "var(--text-primary)" },
+                  { label: "Wired",         value: detail.wired_clients,    color: "var(--text-primary)" },
                 ].map(s => (
                   <div key={s.label} style={{ background: "var(--bg-card)", padding: "18px 16px" }}>
                     <div style={{ fontSize: "0.68rem", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--text-muted)", marginBottom: 10 }}>{s.label}</div>
@@ -623,7 +944,6 @@ function NetworkDashboard() {
                 ))}
               </div>
 
-              {/* Devices table */}
               <div style={{ marginBottom: 24 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, paddingBottom: 10, borderBottom: "1px solid var(--border-color)" }}>
                   <span style={{ fontSize: "0.75rem", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--text-muted)", fontWeight: 600 }}>Devices</span>
@@ -631,37 +951,32 @@ function NetworkDashboard() {
                 </div>
                 <div style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)", borderRadius: 8, overflow: "hidden" }}>
                   <table className="req-table">
-                    <thead>
-                      <tr><th>Name</th><th>Model</th><th>IP Address</th><th>MAC</th><th>Firmware</th><th>Status</th></tr>
-                    </thead>
+                    <thead><tr><th>Name</th><th>Model</th><th>IP Address</th><th>MAC</th><th>Firmware</th><th>Status</th></tr></thead>
                     <tbody>
-                      {!detail.devices?.length ? (
-                        <tr><td colSpan={6} style={{ textAlign: "center", color: "var(--text-secondary)", padding: 32 }}>No devices found</td></tr>
-                      ) : detail.devices.map((d, i) => (
-                        <tr key={i}>
-                          <td style={{ fontWeight: 600 }}>{d.name || "—"}</td>
-                          <td><span className="status-badge" style={{ background: "var(--border-color)", color: "var(--text-secondary)", fontSize: "0.7rem" }}>{d.model || "—"}</span></td>
-                          <td style={{ fontFamily: "monospace", fontSize: "0.85rem", color: "var(--text-secondary)" }}>{d.ip || "—"}</td>
-                          <td style={{ fontFamily: "monospace", fontSize: "0.8rem", color: "var(--text-muted)" }}>{d.mac || "—"}</td>
-                          <td>
-                            {!d.firmwareStatus || d.firmwareStatus === "upToDate"
-                              ? <span className="status-badge status-approved">Up to date</span>
-                              : d.firmwareStatus === "upgradeable"
-                                ? <span className="status-badge" style={{ background: "hsla(38,90%,50%,0.12)", color: "hsl(var(--color-orange))" }}>Update available</span>
-                                : <span className="status-badge" style={{ background: "var(--border-color)", color: "var(--text-secondary)" }}>{d.firmwareStatus}</span>
-                            }
-                          </td>
-                          <td>
-                            <span className={`status-badge ${d.status === "online" ? "status-approved" : "status-rejected"}`}>{d.status || "—"}</span>
-                          </td>
-                        </tr>
-                      ))}
+                      {!detail.devices?.length
+                        ? <tr><td colSpan={6} style={{ textAlign: "center", color: "var(--text-secondary)", padding: 32 }}>No devices found</td></tr>
+                        : detail.devices.map((d, i) => (
+                          <tr key={i}>
+                            <td style={{ fontWeight: 600 }}>{d.name || "—"}</td>
+                            <td><span className="status-badge" style={{ background: "var(--border-color)", color: "var(--text-secondary)", fontSize: "0.7rem" }}>{d.model || "—"}</span></td>
+                            <td style={{ fontFamily: "monospace", fontSize: "0.85rem", color: "var(--text-secondary)" }}>{d.ip || "—"}</td>
+                            <td style={{ fontFamily: "monospace", fontSize: "0.8rem", color: "var(--text-muted)" }}>{d.mac || "—"}</td>
+                            <td>
+                              {!d.firmwareStatus || d.firmwareStatus === "upToDate"
+                                ? <span className="status-badge status-approved">Up to date</span>
+                                : d.firmwareStatus === "upgradeable"
+                                  ? <span className="status-badge" style={{ background: "hsla(38,90%,50%,0.12)", color: "hsl(var(--color-orange))" }}>Update available</span>
+                                  : <span className="status-badge" style={{ background: "var(--border-color)", color: "var(--text-secondary)" }}>{d.firmwareStatus}</span>
+                              }
+                            </td>
+                            <td><span className={`status-badge ${d.status === "online" ? "status-approved" : "status-rejected"}`}>{d.status || "—"}</span></td>
+                          </tr>
+                        ))}
                     </tbody>
                   </table>
                 </div>
               </div>
 
-              {/* Client summary */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
                 {[
                   { label: "Wireless Clients", count: detail.wireless_clients, desc: "connected via WiFi" },
