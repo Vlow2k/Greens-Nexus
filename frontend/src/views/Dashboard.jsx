@@ -1,5 +1,5 @@
 import { CheckSquare, Clock, Users, Calendar, ShoppingCart, FileText, TrendingUp, Star } from 'lucide-react';
-import { useAccounts } from '@azure/msal-react';
+import { useMsal } from '@azure/msal-react';
 
 function useGreeting(name) {
   const hour = new Date().getHours();
@@ -8,7 +8,7 @@ function useGreeting(name) {
 }
 
 export default function Dashboard({ onNavigate }) {
-  const accounts = useAccounts();
+  const { accounts } = useMsal();
   const firstName = (accounts[0]?.name ?? 'there').split(' ')[0];
   const greeting = useGreeting(firstName);
   const kpis = [
