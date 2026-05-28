@@ -339,7 +339,7 @@ function NetworkDashboard() {
       return r.json();
     } catch (e) {
       clearTimeout(timer);
-      if (e.name === 'AbortError') throw new Error('Request timed out — backend may be waking up. Try refreshing in a few seconds.');
+      if (e.name === 'AbortError') throw new Error('Request timed out — backend may be waking up. Try refreshing in a few seconds.', { cause: e });
       throw e;
     }
   };
