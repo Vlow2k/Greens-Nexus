@@ -30,8 +30,24 @@ const AMA_ENTITIES = [
   { id: 4, entity: 'Global Property Management Inc', status: 'Active', feeRate: 2.5, billedYTD: 45000, nextBilling: '2026-06-15' },
 ];
 
-const TABS = ['transactions', 'invoices', 'budgets', 'imports', 'ramp', 'ama', 'mre', 'mri', 'reports'];
-const TAB_LABELS = { transactions: 'Transactions', invoices: 'Invoices', budgets: 'Budgets', imports: 'Import Hub', ramp: 'Ramp Cards', ama: 'AMA Entities', mre: 'MRE', mri: 'MRI', reports: 'Reports' };
+const VENDORS = [
+  { name: "Cascade Concrete Co.",    trade: "Concrete",    w9: "On file", coi: "2026-09-14", is1099: true,  gl: "5100 · Site Work",         pos: 7, active: true  },
+  { name: "Northwest Roll-Up Doors", trade: "Roll-up Doors",w9:"On file", coi: "2026-06-02", is1099: true,  gl: "5220 · Doors & Hardware",  pos: 4, active: true  },
+  { name: "Ironline Fencing",        trade: "Fencing",     w9: "Pending", coi: "2026-05-30", is1099: true,  gl: "5140 · Perimeter",         pos: 2, active: true  },
+  { name: "Summit Paving LLC",       trade: "Paving",      w9: "On file", coi: "2026-04-18", is1099: true,  gl: "5160 · Asphalt",           pos: 5, active: true  },
+  { name: "SecureTech Systems",      trade: "Security",    w9: "On file", coi: "2027-01-22", is1099: false, gl: "5400 · Access Control",    pos: 3, active: true  },
+  { name: "Evergreen Electrical",    trade: "Electrical",  w9: "Expired", coi: "2026-03-01", is1099: true,  gl: "5300 · MEP",               pos: 6, active: false },
+];
+
+const AMA_FLAGGED = [
+  { id: "T-4821", date: "2026-05-22", vendor: "Home Depot #4412",  amount: 1284.55, coder: "R. Okafor", q: "Materials for Lakeline gate repair — which job?", days: 4,  status: "Open"      },
+  { id: "T-4806", date: "2026-05-20", vendor: "Shell Fleet",       amount: 96.20,   coder: "M. Lind",   q: "Fuel — Construction truck or Ops van?",          days: 6,  status: "In Review" },
+  { id: "T-4790", date: "2026-05-18", vendor: "Amazon Business",   amount: 442.10,  coder: "S. Patel",  q: "Office supplies vs. facility supplies split?",   days: 8,  status: "Open"      },
+  { id: "T-4775", date: "2026-05-15", vendor: "Grainger",          amount: 2110.00, coder: "R. Okafor", q: "HVAC parts — capitalize or expense?",            days: 11, status: "Open"      },
+];
+
+const TABS = ['transactions', 'invoices', 'budgets', 'imports', 'ramp', 'vendors', 'ask-accountant', 'ama', 'mre', 'mri', 'reports'];
+const TAB_LABELS = { transactions: 'Transactions', invoices: 'Invoices', budgets: 'Budgets', imports: 'Import Hub', ramp: 'Ramp Cards', vendors: 'Vendors', 'ask-accountant': 'Ask My Accountant', ama: 'AMA Entities', mre: 'MRE', mri: 'MRI', reports: 'Reports' };
 
 const fmt = (n) => Math.abs(n).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 
@@ -290,6 +306,90 @@ export default function Accounting({ activeSub, onSubChange }) {
                   ))}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+
+        {/* Vendors */}
+        {sub === 'vendors' && (
+          <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 12, padding: 24, boxShadow: 'var(--shadow-sm)' }}>
+            <h3 style={{ fontSize: '1.1rem', fontFamily: "'Plus Jakarta Sans', sans-serif", marginBottom: 4 }}>Vendor & Subcontractor Registry</h3>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: 20 }}>W-9 status, COI expiry, 1099 eligibility, and GL mapping</p>
+            <div className="req-table-wrapper">
+              <table className="req-table">
+                <thead>
+                  <tr><th>Vendor</th><th>Trade</th><th>W-9</th><th>COI Expiry</th><th>1099</th><th>GL Account</th><th>Open POs</th><th>Status</th></tr>
+                </thead>
+                <tbody>
+                  {VENDORS.map(v => {
+                    const coiDate = new Date(v.coi);
+                    const today = new Date('2026-05-28');
+                    const daysLeft = Math.round((coiDate - today) / 86400000);
+                    const coiOk = daysLeft > 30;
+                    const coiWarn = daysLeft > 0 && daysLeft <= 30;
+                    return (
+                      <tr key={v.name}>
+                        <td style={{ fontWeight: 600 }}>{v.name}</td>
+                        <td style={{ color: 'var(--text-secondary)' }}>{v.trade}</td>
+                        <td>
+                          <span style={{ backgroundColor: v.w9 === 'On file' ? 'hsla(var(--color-green), 0.1)' : v.w9 === 'Pending' ? 'hsla(var(--color-orange), 0.1)' : 'hsla(var(--color-red), 0.1)', color: v.w9 === 'On file' ? 'hsl(var(--color-green))' : v.w9 === 'Pending' ? 'hsl(var(--color-orange))' : 'hsl(var(--color-red))', fontSize: '0.75rem', padding: '2px 8px', borderRadius: 4, fontWeight: 600 }}>{v.w9}</span>
+                        </td>
+                        <td>
+                          <span style={{ color: coiOk ? 'var(--text-primary)' : coiWarn ? 'hsl(var(--color-orange))' : 'hsl(var(--color-red))', fontWeight: coiOk ? 400 : 600, fontFamily: 'monospace', fontSize: '0.85rem' }}>{v.coi}{!coiOk && <span style={{ marginLeft: 4, fontSize: '0.7rem' }}>{daysLeft <= 0 ? '(expired)' : `(${daysLeft}d)`}</span>}</span>
+                        </td>
+                        <td style={{ textAlign: 'center' }}>{v.is1099 ? <span style={{ color: 'hsl(var(--color-green))', fontWeight: 700 }}>✓</span> : <span style={{ color: 'var(--text-muted)' }}>—</span>}</td>
+                        <td style={{ fontFamily: 'monospace', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{v.gl}</td>
+                        <td style={{ textAlign: 'center', fontWeight: 600 }}>{v.pos}</td>
+                        <td><span style={{ backgroundColor: v.active ? 'hsla(var(--color-green), 0.1)' : 'hsla(var(--color-red), 0.1)', color: v.active ? 'hsl(var(--color-green))' : 'hsl(var(--color-red))', fontSize: '0.75rem', padding: '2px 8px', borderRadius: 4, fontWeight: 600 }}>{v.active ? 'Active' : 'Inactive'}</span></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Ask My Accountant */}
+        {sub === 'ask-accountant' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 12, padding: 24, boxShadow: 'var(--shadow-sm)' }}>
+              <h3 style={{ fontSize: '1.1rem', fontFamily: "'Plus Jakarta Sans', sans-serif", marginBottom: 4 }}>Ask My Accountant</h3>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: 20 }}>Transactions flagged for coding clarification — routed to your accountant for review</p>
+              <div className="req-table-wrapper">
+                <table className="req-table">
+                  <thead>
+                    <tr><th>Ticket</th><th>Date</th><th>Vendor</th><th>Amount</th><th>Coded By</th><th>Question</th><th>Days Open</th><th>Status</th></tr>
+                  </thead>
+                  <tbody>
+                    {AMA_FLAGGED.map(f => (
+                      <tr key={f.id}>
+                        <td style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.8rem' }}>{f.id}</td>
+                        <td style={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>{f.date}</td>
+                        <td style={{ fontWeight: 600 }}>{f.vendor}</td>
+                        <td style={{ fontWeight: 700 }}>${f.amount.toFixed(2)}</td>
+                        <td style={{ color: 'var(--text-secondary)' }}>{f.coder}</td>
+                        <td style={{ maxWidth: 260, fontSize: '0.85rem', color: 'var(--text-primary)' }}>{f.q}</td>
+                        <td style={{ textAlign: 'center' }}>
+                          <span style={{ backgroundColor: f.days >= 7 ? 'hsla(var(--color-red), 0.1)' : 'hsla(var(--color-orange), 0.1)', color: f.days >= 7 ? 'hsl(var(--color-red))' : 'hsl(var(--color-orange))', fontSize: '0.75rem', padding: '2px 8px', borderRadius: 4, fontWeight: 600 }}>{f.days}d</span>
+                        </td>
+                        <td>
+                          <span style={{ backgroundColor: f.status === 'In Review' ? 'hsla(var(--color-blue), 0.1)' : 'hsla(var(--color-orange), 0.1)', color: f.status === 'In Review' ? 'hsl(var(--color-blue))' : 'hsl(var(--color-orange))', fontSize: '0.75rem', padding: '2px 8px', borderRadius: 4, fontWeight: 600 }}>{f.status}</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 12, padding: 24, boxShadow: 'var(--shadow-sm)' }}>
+              <div style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: 12, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Flag a new transaction for review</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div className="form-group"><label>Vendor / Payee</label><input type="text" className="form-input" placeholder="e.g. Home Depot #4412" /></div>
+                <div className="form-group"><label>Amount ($)</label><input type="number" className="form-input" placeholder="e.g. 1284.55" /></div>
+                <div className="form-group" style={{ gridColumn: '1 / -1' }}><label>Your question for the accountant</label><input type="text" className="form-input" placeholder="e.g. Should this be capitalized or expensed?" /></div>
+              </div>
+              <button className="primary-btn" style={{ marginTop: 12 }}>Submit for Review</button>
             </div>
           </div>
         )}
