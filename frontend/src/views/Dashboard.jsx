@@ -1,6 +1,16 @@
 import { CheckSquare, Clock, Users, Calendar, ShoppingCart, FileText, TrendingUp, Star } from 'lucide-react';
+import { useAccounts } from '@azure/msal-react';
+
+function useGreeting(name) {
+  const hour = new Date().getHours();
+  const time = hour < 12 ? 'Morning' : hour < 17 ? 'Afternoon' : 'Evening';
+  return `Good ${time}, ${name}`;
+}
 
 export default function Dashboard({ onNavigate }) {
+  const accounts = useAccounts();
+  const firstName = (accounts[0]?.name ?? 'there').split(' ')[0];
+  const greeting = useGreeting(firstName);
   const kpis = [
     { title: 'My Tasks', value: 5, helper: '3 due today', color: 'card-blue', icon: CheckSquare, nav: 'tasks' },
     { title: 'Pending Approvals', value: 5, helper: 'Requires action', color: 'card-orange', icon: Clock, nav: 'purchase' },
@@ -15,7 +25,7 @@ export default function Dashboard({ onNavigate }) {
   return (
     <div className="dashboard-view">
       <section className="greeting-section">
-        <h1 className="greeting-title">Good Morning, Pranshu</h1>
+        <h1 className="greeting-title">{greeting}</h1>
         <p className="greeting-sub">Here's what's happening with your work today</p>
       </section>
 
