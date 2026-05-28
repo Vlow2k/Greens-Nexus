@@ -34,6 +34,9 @@
   --sidebar-hover-bg:   var(--mist);
   --sidebar-active-bg:  var(--pine);
   --sidebar-active-text: #ffffff;
+  --nav-text:           rgba(15,23,42,0.5);
+  --nav-text-hover:     rgba(15,23,42,0.85);
+  --nav-text-active:    #0f172a;
   --shadow-sm: 0 1px 2px rgba(0,0,0,.04), 0 1px 4px rgba(0,0,0,.04);
   --shadow-md: 0 2px 8px rgba(0,0,0,.06), 0 4px 20px rgba(0,0,0,.05);
   --shadow-lg: 0 8px 30px rgba(0,0,0,.08), 0 2px 8px rgba(0,0,0,.04);
@@ -76,6 +79,9 @@
   --sidebar-hover-bg:   rgba(255,255,255,0.07);
   --sidebar-active-bg:  rgba(255,255,255,0.12);
   --sidebar-active-text: #f1f5f9;
+  --nav-text:           #7a90ad;
+  --nav-text-hover:     #b8cce0;
+  --nav-text-active:    #f1f5f9;
   --shadow-sm: 0 1px 3px rgba(0,0,0,.5), 0 1px 6px rgba(0,0,0,.35);
   --shadow-md: 0 2px 12px rgba(0,0,0,.6), 0 4px 24px rgba(0,0,0,.45);
   --shadow-lg: 0 8px 32px rgba(0,0,0,.7), 0 2px 10px rgba(0,0,0,.5);
@@ -174,23 +180,21 @@ h1,h2,h3,h4,h5,h6,
   padding: 8px 10px;
   border-radius: 9px;
   cursor: pointer;
-  color: var(--ink);
+  color: var(--nav-text);
   font-size: 13px;
   font-weight: 500;
-  transition: background var(--transition-fast), color var(--transition-fast), opacity var(--transition-fast);
+  transition: background var(--transition-fast), color var(--transition-fast);
   user-select: none;
   list-style: none;
-  opacity: 0.6;
 }
-.nav-item:not(.active):not(.has-submenu) { opacity: 0.6; }
-.nav-item:hover { background: var(--sidebar-hover-bg); color: var(--ink); opacity: 1; }
-.nav-item.active { background: var(--sidebar-active-bg); color: var(--sidebar-active-text); opacity: 1; }
-.nav-item.active svg { color: var(--sidebar-active-text); opacity: .9; }
+.nav-item:hover { background: var(--sidebar-hover-bg); color: var(--nav-text-hover); }
+.nav-item.active { background: var(--sidebar-active-bg); color: var(--sidebar-active-text); }
+.nav-item.active svg { color: var(--sidebar-active-text); }
 
 /* items with submenu */
-.nav-item.has-submenu { cursor: default; flex-direction: column; align-items: stretch; padding: 0; gap: 0; opacity: 1; }
+.nav-item.has-submenu { cursor: default; flex-direction: column; align-items: stretch; padding: 0; gap: 0; color: var(--nav-text); }
 .nav-item.has-submenu:hover { background: transparent; }
-.nav-item.has-submenu.active { background: transparent; color: var(--ink); }
+.nav-item.has-submenu.active { background: transparent; color: var(--nav-text); }
 
 .nav-item-main {
   display: flex;
@@ -199,14 +203,13 @@ h1,h2,h3,h4,h5,h6,
   padding: 8px 10px;
   border-radius: 9px;
   cursor: pointer;
-  color: var(--ink);
+  color: var(--nav-text);
   font-size: 13px;
   font-weight: 500;
-  opacity: 0.6;
-  transition: background var(--transition-fast), color var(--transition-fast), opacity var(--transition-fast);
+  transition: background var(--transition-fast), color var(--transition-fast);
 }
-.nav-item-main:hover { background: var(--sidebar-hover-bg); opacity: 1; }
-.nav-item.has-submenu.active .nav-item-main { opacity: 1; color: var(--ink); }
+.nav-item-main:hover { background: var(--sidebar-hover-bg); color: var(--nav-text-hover); }
+.nav-item.has-submenu.active .nav-item-main { color: var(--nav-text-hover); }
 
 .submenu-toggle-btn {
   margin-left: auto;
@@ -217,7 +220,6 @@ h1,h2,h3,h4,h5,h6,
   display: flex;
   align-items: center;
   padding: 2px;
-  opacity: .6;
 }
 
 .sidebar-submenu { list-style: none; margin: 2px 0 5px 14px; border-left: 1px solid var(--line); padding-left: 8px; display: flex; flex-direction: column; gap: 1px; }
@@ -229,15 +231,14 @@ h1,h2,h3,h4,h5,h6,
   padding: 6px 10px;
   border-radius: 7px;
   cursor: pointer;
-  color: var(--ink);
+  color: var(--nav-text);
   font-size: 12.5px;
   font-weight: 500;
-  opacity: 0.5;
-  transition: background var(--transition-fast), opacity var(--transition-fast);
+  transition: background var(--transition-fast), color var(--transition-fast);
 }
-.submenu-item:hover { background: var(--sidebar-hover-bg); opacity: 0.85; }
-.submenu-item.active { opacity: 1; font-weight: 600; }
-.submenu-item.active::before { content: ''; display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: var(--ink); margin-right: -2px; flex-shrink: 0; }
+.submenu-item:hover { background: var(--sidebar-hover-bg); color: var(--nav-text-hover); }
+.submenu-item.active { color: var(--nav-text-active); font-weight: 600; }
+.submenu-item.active::before { content: ''; display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: var(--nav-text-active); margin-right: -2px; flex-shrink: 0; }
 
 /* nav badge (NEW) */
 .nav-badge {
