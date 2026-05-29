@@ -1,6 +1,7 @@
 import csv
 import io
 import re
+from contextlib import asynccontextmanager
 from datetime import datetime
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,12 +13,18 @@ import models
 from database import engine, get_db
 from unifi_client import fetch_all, build_site_payload
 
-try:
-    models.Base.metadata.create_all(bind=engine)
-except Exception as e:
-    print(f"[startup] DB not ready: {e}")
 
-app = FastAPI(title="Greens Nexus API")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    try:
+        models.Base.metadata.create_all(bind=engine)
+        print("[startup] DB tables ready")
+    except Exception as e:
+        print(f"[startup] DB not ready: {e}")
+    yield
+
+
+app = FastAPI(title="Greens Nexus API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
