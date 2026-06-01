@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { AuthenticatedTemplate, UnauthenticatedTemplate } from "@azure/msal-react";
-import { RequisitionProvider } from "./RequisitionContext";
+import { RequisitionProvider } from "./contexts/RequisitionContext";
 import LoginPage from "./views/LoginPage";
 import Sidebar from "./components/Sidebar";
 import TopHeader from "./components/TopHeader";

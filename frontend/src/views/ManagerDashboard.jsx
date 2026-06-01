@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Folder, AlertCircle, MessageSquare, Clock, Users, SlidersHorizontal, Download, CheckCircle, XCircle, ChevronDown } from 'lucide-react';
-import { useRequisitions } from '../RequisitionContext';
+import { useRequisitions } from '../contexts/RequisitionContext';
 
 const EMPLOYEES = [
   { name: 'Sarah Johnson',    dept: 'Accounting',  tasks: 8,  est: 32, act: 18, completed: 3, inprogress: 4, overdue: 1, workload: 85 },
