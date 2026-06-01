@@ -42,7 +42,7 @@ app.add_middleware(
 
 @app.get("/")
 def health():
-    return {"status": "ok"}
+    return {"status": "ok", "app": "Greens Nexus API"}
 
 
 # ── Pydantic Schemas ────────────────────────────────────────────────────────
