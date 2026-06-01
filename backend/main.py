@@ -33,6 +33,7 @@ app.add_middleware(
         "http://127.0.0.1:5173",
         "https://vlow2k.github.io",
         "https://nexus.greensglobal.com",
+        "https://dev.nexus.greensglobal.com",
     ],
     allow_methods=["*"],
     allow_headers=["*"],
