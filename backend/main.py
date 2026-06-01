@@ -454,40 +454,49 @@ def list_requisitions(db: Session = Depends(get_db)):
 @app.post("/requisitions", status_code=201)
 def create_requisition(data: RequisitionCreate, db: Session = Depends(get_db)):
     req = models.Requisition(**data.model_dump(), created_at=_ts(), updated_at=_ts())
-    db.add(req); db.commit(); db.refresh(req)
+    db.add(req)
+    db.commit()
+    db.refresh(req)
     return req
 
 @app.patch("/requisitions/{req_id}/approve")
 def approve_requisition(req_id: str, body: RequisitionApprove, db: Session = Depends(get_db)):
     req = db.query(models.Requisition).filter(models.Requisition.id == req_id).first()
-    if not req: raise HTTPException(404, "Requisition not found")
+    if not req:
+        raise HTTPException(404, "Requisition not found")
     req.status = "manager_approved"
     req.manager_name = body.manager_name
     req.manager_approval_date = _ts()
     req.updated_at = _ts()
     db.add(models.ApprovalHistory(requisition_id=req_id, action="Approved", action_by=body.manager_name, action_role="Manager", created_at=_ts()))
-    db.commit(); db.refresh(req)
+    db.commit()
+    db.refresh(req)
     return req
 
 @app.patch("/requisitions/{req_id}/reject")
 def reject_requisition(req_id: str, body: RequisitionReject, db: Session = Depends(get_db)):
     req = db.query(models.Requisition).filter(models.Requisition.id == req_id).first()
-    if not req: raise HTTPException(404, "Requisition not found")
+    if not req:
+        raise HTTPException(404, "Requisition not found")
     req.status = "rejected"
     req.manager_name = body.manager_name
     req.rejection_reason = body.rejection_reason
     req.updated_at = _ts()
     db.add(models.ApprovalHistory(requisition_id=req_id, action="Rejected", action_by=body.manager_name, action_role="Manager", comment=body.rejection_reason, created_at=_ts()))
-    db.commit(); db.refresh(req)
+    db.commit()
+    db.refresh(req)
     return req
 
 @app.patch("/requisitions/{req_id}/allocate")
 def allocate_asset(req_id: str, body: RequisitionAllocate, db: Session = Depends(get_db)):
     req   = db.query(models.Requisition).filter(models.Requisition.id == req_id).first()
     asset = db.query(models.HardwareAsset).filter(models.HardwareAsset.id == body.asset_id).first()
-    if not req:   raise HTTPException(404, "Requisition not found")
-    if not asset: raise HTTPException(404, "Asset not found")
-    if asset.status != "Available": raise HTTPException(400, "Asset not available")
+    if not req:
+        raise HTTPException(404, "Requisition not found")
+    if not asset:
+        raise HTTPException(404, "Asset not found")
+    if asset.status != "Available":
+        raise HTTPException(400, "Asset not available")
 
     asset.status = "Checked Out"
     asset.assigned_to = req.employee_name
@@ -505,13 +514,15 @@ def allocate_asset(req_id: str, body: RequisitionAllocate, db: Session = Depends
     req.updated_at = _ts()
 
     db.add(models.ApprovalHistory(requisition_id=req_id, action="Asset Allocated", action_by=body.supervisor_name, action_role="Supervisor", comment=f"{asset.name} ({body.asset_id})", created_at=_ts()))
-    db.commit(); db.refresh(req)
+    db.commit()
+    db.refresh(req)
     return req
 
 @app.patch("/requisitions/{req_id}/initiate-return")
 def initiate_return(req_id: str, body: RequisitionReturn, db: Session = Depends(get_db)):
     req = db.query(models.Requisition).filter(models.Requisition.id == req_id).first()
-    if not req: raise HTTPException(404, "Requisition not found")
+    if not req:
+        raise HTTPException(404, "Requisition not found")
     if req.asset_id:
         asset = db.query(models.HardwareAsset).filter(models.HardwareAsset.id == req.asset_id).first()
         if asset:
@@ -520,13 +531,15 @@ def initiate_return(req_id: str, body: RequisitionReturn, db: Session = Depends(
     req.status = "return_initiated"
     req.updated_at = _ts()
     db.add(models.ApprovalHistory(requisition_id=req_id, action="Return Initiated", action_by=body.initiated_by, action_role="Employee", created_at=_ts()))
-    db.commit(); db.refresh(req)
+    db.commit()
+    db.refresh(req)
     return req
 
 @app.patch("/requisitions/{req_id}/confirm-return")
 def confirm_return(req_id: str, body: RequisitionConfirmReturn, db: Session = Depends(get_db)):
     req = db.query(models.Requisition).filter(models.Requisition.id == req_id).first()
-    if not req: raise HTTPException(404, "Requisition not found")
+    if not req:
+        raise HTTPException(404, "Requisition not found")
     if req.asset_id:
         asset = db.query(models.HardwareAsset).filter(models.HardwareAsset.id == req.asset_id).first()
         if asset:
@@ -540,13 +553,15 @@ def confirm_return(req_id: str, body: RequisitionConfirmReturn, db: Session = De
     req.return_asset_condition = body.condition
     req.updated_at = _ts()
     db.add(models.ApprovalHistory(requisition_id=req_id, action="Return Confirmed", action_by=body.supervisor_name, action_role="Supervisor", comment=f"Condition: {body.condition}", created_at=_ts()))
-    db.commit(); db.refresh(req)
+    db.commit()
+    db.refresh(req)
     return req
 
 @app.patch("/requisitions/{req_id}/mark-lost")
 def mark_lost(req_id: str, body: RequisitionMarkLost, db: Session = Depends(get_db)):
     req = db.query(models.Requisition).filter(models.Requisition.id == req_id).first()
-    if not req: raise HTTPException(404, "Requisition not found")
+    if not req:
+        raise HTTPException(404, "Requisition not found")
     if req.asset_id:
         asset = db.query(models.HardwareAsset).filter(models.HardwareAsset.id == req.asset_id).first()
         if asset:
@@ -555,7 +570,8 @@ def mark_lost(req_id: str, body: RequisitionMarkLost, db: Session = Depends(get_
     req.status = "asset_lost"
     req.updated_at = _ts()
     db.add(models.ApprovalHistory(requisition_id=req_id, action="Asset Lost", action_by=body.supervisor_name, action_role="Supervisor", comment=body.notes, created_at=_ts()))
-    db.commit(); db.refresh(req)
+    db.commit()
+    db.refresh(req)
     return req
 
 @app.get("/requisitions/export/excel")
@@ -652,7 +668,9 @@ def list_hardware_assets(db: Session = Depends(get_db)):
 @app.post("/hardware-assets", status_code=201)
 def create_hardware_asset(data: HardwareAssetCreate, db: Session = Depends(get_db)):
     asset = models.HardwareAsset(**data.model_dump(), last_updated=_ts()[:10])
-    db.add(asset); db.commit(); db.refresh(asset)
+    db.add(asset)
+    db.commit()
+    db.refresh(asset)
     return asset
 
 @app.get("/approval-history/{req_id}")
